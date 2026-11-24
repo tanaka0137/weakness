@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>カメラ重ねテキスト</title>
+<style>
+  :root {
+    --panel: 0, 0, 0;
+    --ink: #fff;
+    --muted: rgba(255,255,255,.7);
+    --accent: #7fe3c4;
+    --bg: #14181c;
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #0d1013; } }
+  :root[data-theme="dark"] { --bg: #0d1013; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--ink);
+    font-family: "Noto Sans JP", "Hiragino Sans", "Yu Gothic", sans-serif; }
+  #cam { position: fixed; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  #panel {
+    position: fixed; left: 12px; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+    max-width: 640px; margin: 0 auto; height: 52%;
+    display: flex; flex-direction: column;
+    background: rgba(var(--panel), var(--a, .5));
+    -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+    border-radius: 16px; overflow: hidden;
+  }
+  #bar { display: flex; align-items: center; gap: 12px; padding: 10px 14px; font-size: 13px; color: var(--muted); }
+  #bar input { flex: 1; accent-color: var(--accent); min-width: 0; }
+  #bar button { background: none; border: 1px solid var(--muted); color: var(--ink); border-radius: 8px; padding: 4px 10px; font: inherit; }
+  #bar button:focus-visible, #bar input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  #text { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 0 18px 24px; line-height: 1.85; font-size: 16px; }
+  #text h1 { font-size: 20px; margin: 4px 0 12px; }
+  #text p { margin: 0 0 1em; }
+  body.nocam #panel { height: calc(100% - 24px - env(safe-area-inset-bottom, 0px) - 56px); top: 56px; bottom: auto; }
+  body.nocam { background: linear-gradient(160deg, #1d2a33, #0d1013); }
+  #retry { display: none; margin: 8px auto 0; background: none; border: 1px solid var(--muted); color: var(--ink);
+    border-radius: 8px; padding: 6px 14px; font: inherit; font-size: 13px; }
+  body.nocam #retry { display: block; }
+  #panel.min { height: auto; }
+  #panel.min #text { display: none; }
+  #msg { z-index: 2; position: fixed; top: calc(16px + env(safe-area-inset-top, 0px)); left: 16px; right: 16px; text-align: center;
+    font-size: 13px; color: var(--muted); }
+</style>
+</head>
+<body>
+<video id="cam" autoplay playsinline muted></video>
+<div id="msg">カメラを起動しています…<button id="retry" type="button">カメラを再試行</button></div>
+
+<section id="panel" aria-label="説明テキスト">
+  <div id="bar">
+    <label for="alpha">濃さ</label>
+    <input id="alpha" type="range" min="0.15" max="0.9" step="0.05" value="0.5">
+    <button id="toggle" type="button">たたむ</button>
+  </div>
+  <div id="text" tabindex="0">
+    <h1>ここにタイトル</h1>
+    <p>カメラ映像の上に、半透明のパネルが重なっています。パネルの中だけが上下にスクロールでき、背景のカメラはそのまま動き続けます。</p>
+    <p>この文章は index の #text の中身を書き換えるだけで差し替えられます。見出し、段落、リンクも自由に入れられます。</p>
+    <p>長い説明や手順、展示物の解説、商品の使い方など、QRコードの先に見せたい内容をここに入れてください。</p>
+    <p>スクロールの確認用に、少し長めの文章を続けます。カメラを動かすと背景が変わりますが、文字の読みやすさは濃さのスライダーで調整できます。</p>
+    <p>パネルが邪魔なときは「たたむ」を押すと、カメラ映像だけが見えます。</p>
+    <p>以上がサンプルです。</p>
+  </div>
+</section>
+
+<script>
+  var cam = document.getElementById("cam"), msg = document.getElementById("msg");
+  var panel = document.getElementById("panel");
+
+  document.getElementById("alpha").addEventListener("input", function (e) {
+    panel.style.setProperty("--a", e.target.value);
+  });
+  var toggle = document.getElementById("toggle");
+  toggle.addEventListener("click", function () {
+    var min = panel.classList.toggle("min");
+    toggle.textContent = min ? "ひらく" : "たたむ";
+  });
+
+  function fail(text) {
+    document.body.classList.add("nocam");
+    msg.firstChild.nodeValue = text;
+    msg.style.display = "block";
+  }
+  function start() {
+    document.body.classList.remove("nocam");
+    msg.firstChild.nodeValue = "カメラを起動しています…";
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      fail("カメラを使えない環境です。文章だけ表示しています。標準ブラウザ(Safari / Chrome)で開き直すとカメラが使えます。");
+      return;
+    }
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } }, audio: false })
+      .then(function (stream) {
+        cam.srcObject = stream;
+        msg.style.display = "none";
+      })
+      .catch(function () {
+        fail("カメラが許可されていないため、文章だけ表示しています。許可すると背景にカメラが映ります。");
+      });
+  }
+  document.getElementById("retry").addEventListener("click", start);
+  start();
+</script>
+</body>
+</html>
